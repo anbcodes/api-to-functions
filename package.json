@@ -1,15 +1,15 @@
 {
-  "name": "@anbcodes/channel-to-functions",
-  "version": "1.0.0",
-  "description": "",
+  "name": "@anbcodes/api-to-functions",
+  "version": "0.0.2",
+  "author": "anbcodes",
+  "description": "A simple way to convert an API to async JS functions.",
   "main": "lib/index.js",
   "scripts": {
     "lint": "eslint .",
     "build": "babel src -d lib"
   },
   "keywords": [],
-  "author": "",
-  "license": "ISC",
+  "license": "MIT",
   "dependencies": {
     "@babel/runtime-corejs3": "^7.10.4"
   },
