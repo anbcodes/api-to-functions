@@ -1,5 +1,5 @@
 {
-  "name": "requests-to-functions",
+  "name": "@anbcodes/channel-to-functions",
   "version": "1.0.0",
   "description": "",
   "main": "lib/index.js",
