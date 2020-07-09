@@ -2,6 +2,7 @@
   "name": "@anbcodes/api-to-functions",
   "version": "0.0.2",
   "author": "anbcodes",
+  "private": false,
   "description": "A simple way to convert an API to async JS functions.",
   "main": "lib/index.js",
   "scripts": {
