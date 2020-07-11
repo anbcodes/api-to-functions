@@ -1,4 +1,4 @@
-const AsyncMessagesToFunctions = require('@anbcodes/channel-to-functions');
+const AsyncMessagesToFunctions = require('@anbcodes/api-to-functions');
 
 let onResponse1;
 let onResponse2;

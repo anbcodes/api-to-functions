@@ -1,14 +1,16 @@
 module.exports = {
   root: true,
+  parser: '@typescript-eslint/parser',
   env: {
     node: true,
   },
   extends: [
     'airbnb',
+    'plugin:@typescript-eslint/recommended',
   ],
-  // plugins: [
-  //   'airbnb'
-  // ],
+  plugins: [
+    '@typescript-eslint',
+  ],
   parserOptions: {
     ecmaVersion: 2020,
   },
