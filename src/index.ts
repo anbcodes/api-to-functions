@@ -13,7 +13,18 @@ interface ReturnMessage {
   type: "ReturnMessage"
 }
 
-type Message = ReturnMessage | RequestMessage;
+interface RegisterMessage {
+  name: string,
+  id: number,
+  type: "RegisterMessage"
+}
+
+interface RegisterSuccessMessage {
+  id: number,
+  type: "RegisterSuccessMessage",
+}
+
+type Message = ReturnMessage | RequestMessage | RegisterMessage | RegisterSuccessMessage;
 
 type TypeMap<U extends {type: ObjectKey}> = {
   [K in U["type"]]: U extends {type: K} ? U : never
@@ -26,38 +37,41 @@ type Pattern<T, U extends {type: ObjectKey}> = {
 type ObjectKey = string | number | symbol
 
 function match<Type extends {type: ObjectKey},ReturnType>(pattern: Pattern<ReturnType, Type>): (type: Type) => ReturnType {
-  return (type) => pattern[type.type as Type["type"]](type as any)
+  return (type) => {
+    return pattern[type.type as Type["type"]](type as any)
+  }
 }
 
-type Obj<T> = Record<string, T>
 
-module.exports = class AsyncMessagesToFunctions {
+export default class AsyncMessagesToFunctions<ApiType> {
   waiting: Record<string, any>
 
-  functions: Record<string, any>
+  functions: ApiType
 
   constructor(
     private requestFunction: (message: Message) => void,
     private addListener: (func: (message: Message) => void) => void,
   ) {
     this.waiting = {};
-    this.functions = {};
+    this.functions = {} as ApiType;
     this.createListener();
   }
-
-  registerRemote(name: string) {
-    this.functions[name] = (...args: any[]) => new Promise((resolve, reject) => {
-      const id: number = Math.random();
-      this.waiting[id] = { resolve, reject };
-      this.requestFunction({ name, args, id } as RequestMessage);
-    });
+  /**
+   * @description Registers a function from the client which can then be called on the server
+   * @param name string
+   * @param func any
+   */
+  register(name: string, func: any): Promise<undefined> {
+    return new Promise((resolve, reject) => {
+      //@ts-ignore
+      this.functions[name] = func;
+      const id = Math.random();
+      this.waiting[id] = {resolve, reject};
+      this.requestFunction({ name, id, type: 'RegisterMessage' });
+    })
   }
 
-  registerLocal(name: string, func: any) {
-    this.functions[name] = func;
-  }
-
-  private createListener() {
+  private createListener(): void {
     this.addListener(match<Message, void>({
       ReturnMessage: ({ id, value }) => {
         if (value instanceof Error) {
@@ -70,11 +84,25 @@ module.exports = class AsyncMessagesToFunctions {
       RequestMessage: ({ id, name, args }) => {
         let returnValue;
         try {
+          //@ts-ignore
           returnValue = this.functions[name](...args);
         } catch (e) {
-          this.requestFunction({ value: e, id } as ReturnMessage);
+          this.requestFunction({ value: e, id, type: 'ReturnMessage' });
         }
-        this.requestFunction({ value: returnValue, id } as ReturnMessage);
+        this.requestFunction({ value: returnValue, id, type: 'ReturnMessage' });
+      },
+      RegisterMessage: ({ name, id }) => {
+        //@ts-ignore
+        this.functions[name] = (...args: any[]) => new Promise((resolve, reject) => {
+          const id: number = Math.random();
+          this.waiting[id] = { resolve, reject };
+          this.requestFunction({ name, args, id, type: 'RequestMessage' });
+        });
+        this.requestFunction({ id, type: 'RegisterSuccessMessage' });
+      },
+      RegisterSuccessMessage: ({ id }) => {
+        this.waiting[id].resolve();
+        delete this.waiting[id];
       }
     }).bind(this));
   }
