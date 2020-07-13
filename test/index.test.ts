@@ -24,12 +24,12 @@ function createInstances<ClientApi, ServerApi>(timeout?: number): ServerClientIn
   return {
     clientMessagesInstance: new AsyncMessagesToFunctions<ClientApi>(
       clientSender,
-      (func) => clientReceiver = func,
+      (func) => clientReceiver = (d) => func(JSON.parse(JSON.stringify(d))),
       timeout,
     ),
     serverMessagesInstance: new AsyncMessagesToFunctions<ServerApi>(
       serverSender,
-      (func) => serverReceiver = func,
+      (func) => serverReceiver = (d) => func(JSON.parse(JSON.stringify(d))),
       timeout,
     ),
   };
@@ -118,3 +118,40 @@ test('If a client calls a server function and it is not registered after n milli
   await expect(clientMessagesInstance.functions.mping()).rejects.toThrow('Timeout reached')
   await promise
 });
+
+
+test('Server can return a function and the client can call it.', async () => {
+  expect.assertions(2);
+  type ClientApi = Record<string, AnyFunction>
+
+  type ServerApi = Record<string, AnyFunction>
+
+  const end = (name: string) => {
+    expect(name).toBe('myName')
+    return `Hello ${name}`
+  }
+
+  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
+  serverMessagesInstance.register('getFunc', () => end)
+  const func = await clientMessagesInstance.functions.getFunc()
+
+  await expect(func('myName')).resolves.toBe('Hello myName')
+})
+
+test('Server can return an object with a function and the client can call it.', async () => {
+  expect.assertions(2);
+  type ClientApi = Record<string, AnyFunction>
+
+  type ServerApi = Record<string, AnyFunction>
+
+  const end = (name: string) => {
+    expect(name).toBe('myName')
+    return `Hello ${name}`
+  }
+
+  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
+  serverMessagesInstance.register('getFunc', () => ({end}))
+  const ret = await clientMessagesInstance.functions.getFunc()
+
+  await expect(ret.end('myName')).resolves.toBe('Hello myName')
+})

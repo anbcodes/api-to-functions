@@ -12,21 +12,10 @@ type returnValue = any;
 interface ReturnMessage {
   value: Error | returnValue,
   id: number,
+  valueType: string,
   type: "ReturnMessage"
 }
 
-// interface RegisterMessage {
-//   name: string,
-//   id: number,
-//   type: "RegisterMessage"
-// }
-
-// interface RegisterSuccessMessage {
-//   id: number,
-//   type: "RegisterSuccessMessage",
-// }
-
-// type Message = ReturnMessage | RequestMessage | RegisterMessage | RegisterSuccessMessage;
 type Message = ReturnMessage | RequestMessage;
 
 type TypeMap<U extends {type: ObjectKey}> = {
@@ -47,6 +36,36 @@ function match<Type extends {type: ObjectKey},ReturnType>(pattern: Pattern<Retur
 
 type Dictionary<K extends keyof any, T> = Partial<Record<K, T>>
 
+
+// eslint-disable-next-line @typescript-eslint/ban-types
+function replaceFunctionInObject(obj: any, func: (key: ObjectKey, func: Function) => any, prefix = ''): any {
+  let value = obj
+  if (typeof value === 'function') {
+    value = func(prefix, value)
+  } else if (typeof value === 'object') {
+    Object.keys(obj).forEach(key => {
+      value[key] = replaceFunctionInObject(obj[key], func, prefix + key + '.')
+    })
+  }
+
+  return value
+  
+}
+
+function replaceObjectWithREMOTECALLInObject(obj: any, func: (key: ObjectKey, obj: Dictionary<ObjectKey, unknown>) => any, prefix = ''): any {
+  let value = obj
+  if (typeof value === 'object') {
+    if ((value as Dictionary<ObjectKey,unknown>)?.__REMOTECALL__) {
+      value = func(prefix, (value as Dictionary<ObjectKey,unknown>))
+    } else {
+      Object.keys(obj).forEach(key => {
+        value[key] = replaceObjectWithREMOTECALLInObject(obj[key], func, prefix + key + '.')
+      })
+    }
+  }
+
+  return value
+}
 
 export default class AsyncMessagesToFunctions<ApiType = Dictionary<string,AnyFunction>> {
   waiting: Dictionary<string, any>
@@ -103,10 +122,15 @@ export default class AsyncMessagesToFunctions<ApiType = Dictionary<string,AnyFun
 
   private createListener(): void {
     this.addListener(match<Message, void>({
-      ReturnMessage: ({ id, value }) => {
+      ReturnMessage: ({ id, value, valueType }) => {
+        value = replaceObjectWithREMOTECALLInObject(value, (_, obj) => {
+          return (...args: any[]) => this.sendRequestMessage(`${id}-${obj?.__KEY__}`, args)
+        })
         try {
-          if (value instanceof Error) {
-            this.waiting[id].reject(value);
+          if (valueType === 'error') {
+            const e = new Error(value.message);
+            e.name = value.name;
+            this.waiting[id].reject(e);
           } else {
             this.waiting[id].resolve(value);
           }
@@ -150,32 +174,16 @@ export default class AsyncMessagesToFunctions<ApiType = Dictionary<string,AnyFun
           //@ts-ignore
           returnValue = this.localFunctions[name](...args);
         } catch (e) {
-          this.requestFunction({ value: e, id, type: 'ReturnMessage' });
+          this.requestFunction({ valueType: 'error', value: {name: e.name, message: e.message }, id, type: 'ReturnMessage' });
           return
         }
-        this.requestFunction({ value: returnValue, id, type: 'ReturnMessage' });
+        returnValue = replaceFunctionInObject(returnValue, (key, func) => {
+          this.register(`${id}-${String(key)}`, func as AnyFunction);
+
+          return { __REMOTECALL__: true, __KEY__: key, __ID__: id }
+        })
+        this.requestFunction({ valueType: 'normal', value: returnValue, id, type: 'ReturnMessage' });
       },
-      // RegisterMessage: ({ name, id }) => {
-      //   //@ts-ignore
-      //   this.functions[name] = (...args: any[]) => new Promise((resolve, reject) => {
-      //     const id: number = Math.random();
-      //     this.waiting[id] = { resolve, reject };
-      //     this.requestFunction({ name, args, id, type: 'RequestMessage' });
-      //   });
-      //   this.requestFunction({ id, type: 'RegisterSuccessMessage' });
-      //   let waiters = this.waitersForFunctions[name]
-      //   if (waiters) {
-      //     waiters.forEach((waiter) => {
-      //       if (waiter.resolve) {
-      //         waiter.resolve()
-      //       }
-      //     })
-      //   }
-      // },
-      // RegisterSuccessMessage: ({ id }) => {
-      //   this.waiting[id].resolve();
-      //   delete this.waiting[id];
-      // }
     }).bind(this));
   }
 }
