@@ -1,6 +1,6 @@
 {
   "name": "@anbcodes/api-to-functions",
-  "version": "0.0.4",
+  "version": "0.0.5",
   "author": "anbcodes",
   "private": false,
   "description": "A simple way to convert an API to async JS functions.",
