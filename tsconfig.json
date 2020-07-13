@@ -12,13 +12,15 @@
     "declaration": true,
     "target": "es2015",
     "module": "es2015",
-    "strict": true
+    "strict": true,
+    "moduleResolution": "node"
   },
   "include": [
     "src/**/*"
   ],
   "exclude": [
     "node_modules",
-    "dist"
+    "dist",
+    "test"
   ]
 }
