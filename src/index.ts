@@ -44,7 +44,7 @@ type Pattern<T, U extends {type: ObjectKey}> = {
   [K in keyof TypeMap<U>]: (type: TypeMap<U>[K]) => T
 }
 
-export default class ApiToFunctions<Api = Dictionary<string, AnyFunction>> {
+export default class ApiToFunctions<Api = Record<string, AnyFunction>> {
   remoteFunctions: Api
   localFunctions: Dictionary<string, AnyFunction>
   listenersForFunctionRegistration: Dictionary<functionName, PromiseInfo[]>

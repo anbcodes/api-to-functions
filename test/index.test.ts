@@ -1,224 +1,156 @@
-import AsyncMessagesToFunctions from '../src/index';
+import { createServerAndClientInstances, promiseTimeout } from './utils';
 
-let clientReceiver: (d: any) => void;
+describe('A promise', () => {
+  it('can be returned from a remote function', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', async () => {
+      return 'test value'
+    })
+    expect(client.remoteFunctions.test()).toBeInstanceOf(Promise);
+    //TODO: fix this test
 
-const serverSender = (d: any) => clientReceiver(d);
-let serverReceiver: (d: any) => void;
-const clientSender = (d: any) => serverReceiver(d);
-
-type AnyFunction = (...args: any[]) => any
-
-function promiseTimeout(timeout: number): Promise<void> {
-  return new Promise((resolve) => {
-    setTimeout(resolve, timeout);
   })
-}
 
-
-interface ServerClientInstances<ClientApi, ServerApi> {
-  clientMessagesInstance: AsyncMessagesToFunctions<ClientApi>,
-  serverMessagesInstance: AsyncMessagesToFunctions<ServerApi>,
-}
-
-function createInstances<ClientApi, ServerApi>(timeout?: number): ServerClientInstances<ClientApi, ServerApi> {
-  return {
-    clientMessagesInstance: new AsyncMessagesToFunctions<ClientApi>(
-      clientSender,
-      (func) => clientReceiver = (d) => {
-        // console.log('client', d) // For debugging
-        func(JSON.parse(JSON.stringify(d)))
-      },
-      timeout,
-    ),
-    serverMessagesInstance: new AsyncMessagesToFunctions<ServerApi>(
-      serverSender,
-      (func) => serverReceiver = (d) => {
-        // console.log('server', d) // For debugging
-        func(JSON.parse(JSON.stringify(d)))
-      },
-      timeout,
-    ),
-  };
-}
-
-test('Client can register a function', async () => {
-  type ClientApi = Record<string, AnyFunction>
-  interface ServerApi {
-    ping: () => string
-  }
-  const { clientMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  await clientMessagesInstance.register('ping', () => 'pong');
-});
-
-test('Client can register a function and the server can call it and get a return value', async () => {
-  type ClientApi = Record<string, AnyFunction>
-  interface ServerApi {
-    ping: () => string
-  }
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  await clientMessagesInstance.register('ping', () => 'pong');
-  expect(await serverMessagesInstance.remoteFunctions.ping()).toBe('pong');
-});
-
-test('Client can throw an error and the server will receive it', async () => {
-  type ClientApi = Record<string, AnyFunction>
-  interface ServerApi {
-    ping: () => Promise<string>
-  }
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  await clientMessagesInstance.register('ping', () => { throw new Error('pong'); });
-  await expect(serverMessagesInstance.remoteFunctions.ping()).rejects.toThrow('pong');
-});
-
-test('Server and client can register a function', async () => {
-  interface ClientApi {
-    sping: () => string
-  }
-  interface ServerApi {
-    cping: () => string
-  }
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  await clientMessagesInstance.register('cping', () => 'cpong');
-  await serverMessagesInstance.register('sping', () => 'spong');
-});
-
-test('Server and client can call each other\'s a functions', async () => {
-  interface ClientApi {
-    sping: () => string
-  }
-  interface ServerApi {
-    cping: () => string
-  }
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  await clientMessagesInstance.register('cping', () => 'cpong');
-  await serverMessagesInstance.register('sping', () => 'spong');
-  expect(await serverMessagesInstance.remoteFunctions.cping()).toBe('cpong');
-  expect(await clientMessagesInstance.remoteFunctions.sping()).toBe('spong');
-});
-
-test('Client can call a server function before it is registered', async () => {
-  interface ClientApi {
-    ping: () => string
-  }
-  type ServerApi = Record<string, AnyFunction>
-
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  const promise = promiseTimeout(500).then(() => {
-    serverMessagesInstance.register('ping', () => 'cpong');
-  });
-  await expect(clientMessagesInstance.remoteFunctions.ping()).resolves.toBe('cpong');
-  await promise
-});
-
-test('If a client calls a server function and it is not registered after n milliseconds it errors', async () => {
-  expect.assertions(1);
-  interface ClientApi {
-    mping: () => Promise<string>
-  }
-  type ServerApi = Record<string, AnyFunction>
-
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>(250);
-  const promise = promiseTimeout(500).then(() => {
-    serverMessagesInstance.register('mping', () => 'pong');
+  it('can be resolved from a remote function', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', async () => {
+      return 'test value'
+    })
+    await expect(client.remoteFunctions.test()).resolves.toBe('test value');
   })
-  await expect(clientMessagesInstance.remoteFunctions.mping()).rejects.toThrow('Timeout reached')
-  await promise
-});
 
+  it('can be rejected from a remote function', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', async () => {
+      throw 'test value'
+    })
+    await expect(client.remoteFunctions.test()).rejects.toBe('test value');
+  })
 
-test('Server can return a function and the client can call it.', async () => {
-  expect.assertions(2);
-  type ClientApi = Record<string, AnyFunction>
-
-  type ServerApi = Record<string, AnyFunction>
-
-  const end = (name: string) => {
-    expect(name).toBe('myName')
-    return `Hello ${name}`
-  }
-
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  serverMessagesInstance.register('getFunc', () => end)
-  const func = await clientMessagesInstance.remoteFunctions.getFunc()
-
-  await expect(func('myName')).resolves.toBe('Hello myName')
+  
 })
 
-test('Server can return an object with a function and the client can call it.', async () => {
-  expect.assertions(2);
-  type ClientApi = Record<string, AnyFunction>
+describe('A function', () => {
+  it('can be returned from a remote function', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', () => {
+      return () => 'test value'
+    })
 
-  type ServerApi = Record<string, AnyFunction>
+    await expect(client.remoteFunctions.test()).resolves.toBeInstanceOf(Function)
+  })
 
-  const end = (name: string) => {
-    expect(name).toBe('myName')
-    return `Hello ${name}`
-  }
+  it('can be returned and then called from a remote function', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', () => {
+      return () => 'test value'
+    })
 
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  serverMessagesInstance.register('getFunc', () => ({end}))
-  const ret = await clientMessagesInstance.remoteFunctions.getFunc()
+    const returnValue = await client.remoteFunctions.test()
 
-  await expect(ret.end('myName')).resolves.toBe('Hello myName')
-})
+    await expect(returnValue()).resolves.toBe('test value')
+  })
 
+  it('can be sent to a remote function', (done) => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
 
-test('Client can send a function and the server can call it.', async (done) => {
-  expect.assertions(1);
-  type ClientApi = Record<string, AnyFunction>
-
-  type ServerApi = Record<string, AnyFunction>
-
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  serverMessagesInstance.register('getFunc', (getName: any) => {
-    getName().then((name: string) => {
-      expect(name).toBe('Hey!!')
+    server.register('test', (func) => {
+      expect(func).toBeInstanceOf(Function)
       done()
     })
+
+    client.remoteFunctions.test(() => 'test value')
   })
-  await clientMessagesInstance.remoteFunctions.getFunc(() => 'Hey!!')
-})
 
-test('Client can send an object with a function and the server can call it.', async (done) => {
-  expect.assertions(1);
-  type ClientApi = Record<string, AnyFunction>
+  it('can be sent to a remote function and be called', (done) => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
 
-  type ServerApi = Record<string, AnyFunction>
-
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  serverMessagesInstance.register('getFunc', ({getName}) => {
-    getName().then((name: string) => {
-      expect(name).toBe('Hey!!')
-      done()
+    server.register('test', (func) => {
+      func().then((value: string) => {
+        expect(value).toBe('test value')
+        done()
+      })
     })
+
+    client.remoteFunctions.test(() => 'test value')
   })
-  await clientMessagesInstance.remoteFunctions.getFunc({ getName: () => 'Hey!!' })
+
+  it('can be returned from a remote function within an object and be called', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+
+    server.register('test', () => {
+      return {func: () => 'test value'}
+    });
+
+    const returnValue = await client.remoteFunctions.test()
+
+    await expect(returnValue.func()).resolves.toBe('test value')
+  })
+
+  it('can be sent to a remote function within an object and be called', (done) => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', ({func}) => {
+      func().then((value: string) => {
+        expect(value).toBe('test value')
+        done()
+      })
+    })
+
+    client.remoteFunctions.test({func: () => 'test value'})
+  })
 })
 
-test('Client can send a function and the server can call it and return a promise.', async () => {
-  expect.assertions(1);
-  type ClientApi = Record<string, AnyFunction>
-
-  type ServerApi = Record<string, AnyFunction>
-
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  serverMessagesInstance.register('runFunc', async (getName: any) => {
-    const name = await getName()
-    return `Hello ${name}`
+describe('A error', () => {
+  it('can be thrown from a remote function and be sent back to the client', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', () => {
+      throw new Error('failed')
+    })
+    await expect(client.remoteFunctions.test()).rejects.toThrowError('failed')
   })
-  await expect(clientMessagesInstance.remoteFunctions.runFunc(() => 'Hey!!')).resolves.toBe('Hello Hey!!')
 })
 
-test('Client can send a function within a object and the server can call it and return a promise.', async () => {
-  expect.assertions(1);
-  type ClientApi = Record<string, AnyFunction>
-
-  type ServerApi = Record<string, AnyFunction>
-
-  const { clientMessagesInstance, serverMessagesInstance } = createInstances<ClientApi, ServerApi>();
-  serverMessagesInstance.register('runFunc', async ({getName}) => {
-    const name = await getName()
-    return `Hello ${name}`
+describe('A remote function', () => {
+  it('can be registered', () => {
+    expect.assertions(0);
+    const { server } = createServerAndClientInstances();
+    server.register('test', () => 'test value')
   })
-  await expect(clientMessagesInstance.remoteFunctions.runFunc({getName: () => 'Hey!!'})).resolves.toBe('Hello Hey!!')
+
+  it('can return a value', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    server.register('test', () => 'test value')
+    await expect(client.remoteFunctions.test()).resolves.toBe('test value')
+  })
+
+  it('can be called before it is registered', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances();
+    const promise = promiseTimeout(100).then(() => {
+      server.register('test', () => 'test value')
+    })
+    await expect(client.remoteFunctions.test()).resolves.toBe('test value')
+    await promise
+  })
+
+  it('will not be called and instead throw an error if it is not registered before the specifed timeout', async () => {
+    expect.assertions(1);
+    const { server, client } = createServerAndClientInstances(100);
+    const promise = promiseTimeout(200).then(() => {
+      server.register('test', () => 'test value')
+    })
+    await expect(client.remoteFunctions.test()).rejects.toThrowError('Timeout reached')
+    await promise
+  })
 })
