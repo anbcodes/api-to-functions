@@ -1,26 +1,12 @@
 {
   "compilerOptions": {
-    "allowSyntheticDefaultImports": true,
-    "noFallthroughCasesInSwitch": true,
-    "noUnusedParameters": true,
-    "noImplicitReturns": true,
-    "esModuleInterop": true,
-    "noUnusedLocals": true,
-    "noImplicitAny": true,
-    "declarationDir": "lib/types",
-    "outDir": "lib",
+    "target": "es5",
+    "module": "commonjs",
     "declaration": true,
-    "target": "es2015",
-    "module": "es2015",
+    "outDir": "./lib",
     "strict": true,
-    "moduleResolution": "node"
+    "lib": ["es2015", "es2016"]
   },
-  "include": [
-    "src/**/*"
-  ],
-  "exclude": [
-    "node_modules",
-    "dist",
-    "test"
-  ]
+  "include": ["src"],
+  "exclude": ["node_modules", "**/__tests__/*"]
 }

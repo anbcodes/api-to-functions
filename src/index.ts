@@ -44,11 +44,22 @@ type Pattern<T, U extends {type: ObjectKey}> = {
   [K in keyof TypeMap<U>]: (type: TypeMap<U>[K]) => T
 }
 
+
+/**
+ * A class which provides a way to create an api through methods.
+ */
 export default class ApiToFunctions<Api = Record<string, AnyFunction>> {
   remoteFunctions: Api
   localFunctions: Dictionary<string, AnyFunction>
   listenersForFunctionRegistration: Dictionary<functionName, PromiseInfo[]>
   pendingRequests: Dictionary<messageID, PromiseInfo>
+
+  /**
+   * 
+   * @param sendMessage a function which the class calls to send data to the server (The data is not a string)
+   * @param addMessageListener a function which the class calls with a function as an argument to register a listener for messages.
+   * @param timeout the amount of time the handler should wait for a function to be registered before returning an error
+   */
   constructor(private sendMessage: (d: Message) => void, private addMessageListener: (func: AnyFunction) => void, public timeout = 5000) {
     this.remoteFunctions = new Proxy({}, {get: this.onRemoteFunctionRequest.bind(this)}) as Api
     this.localFunctions = {}
